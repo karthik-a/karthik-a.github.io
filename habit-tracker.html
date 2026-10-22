@@ -19,7 +19,7 @@
     --radius: 16px;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #141417;
       --card: #1d1d22;
       --text: #ececf1;
@@ -27,7 +27,18 @@
       --line: #2b2b32;
       --accent-soft: #1b3a2c;
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141417;
+    --card: #1d1d22;
+    --text: #ececf1;
+    --muted: #8d8d98;
+    --line: #2b2b32;
+    --accent-soft: #1b3a2c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+    color-scheme: dark;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,7 +47,9 @@
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    padding: 40px 16px 80px;
+    padding-block: 40px 80px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
     -webkit-font-smoothing: antialiased;
   }
   .app { max-width: 560px; margin: 0 auto; }
@@ -141,6 +154,11 @@
   .habit:hover .delete, .delete:focus-visible { opacity: 1; }
   .delete:hover { background: var(--bg); color: var(--danger); }
   @media (hover: none) { .delete { opacity: .6; } }
+  .delete.confirming {
+    opacity: 1; width: auto; padding: 0 10px; font-size: 13px; font-weight: 600;
+    background: var(--danger); color: #fff; animation: fill .2s ease-out;
+  }
+  .delete.confirming:hover { background: var(--danger); color: #fff; }
 
   /* Big check toggle */
   .check {
@@ -450,7 +468,21 @@
       refreshCard(habit, card, { bump: nowDone });
       if (nowDone && dot.dataset.key === keyOf(today())) restart(card.querySelector('.check'), 'pop');
     } else if (e.target.closest('.delete')) {
-      if (!confirm(`Delete "${habit.name}"? Its history will be lost.`)) return;
+      // Two taps to delete: the first arms the button, the second within 3s confirms.
+      const del = e.target.closest('.delete');
+      if (!del.classList.contains('confirming')) {
+        del.classList.add('confirming');
+        del.textContent = 'Delete?';
+        del.setAttribute('aria-label', `Tap again to delete ${habit.name} and its history`);
+        clearTimeout(del._reset);
+        del._reset = setTimeout(() => {
+          del.classList.remove('confirming');
+          del.textContent = '×';
+          del.setAttribute('aria-label', 'Delete habit');
+        }, 3000);
+        return;
+      }
+      clearTimeout(del._reset);
       state.habits = state.habits.filter(h => h !== habit);
       save();
       card.classList.add('removing');
