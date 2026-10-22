@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Approval Bot</title>
+  <meta name="description" content="A rule-based bot that automates invoice approvals, with human-in-the-loop review for large amounts and duplicate bill detection.">
+  <style>
+    /* =========================================================
+       Design tokens — teal blue palette
+       ========================================================= */
+    :root {
+      --bg: #f2f8f9;
+      --surface: #ffffff;
+      --surface-2: #e8f3f5;
+      --border: #cfe3e7;
+      --text: #12343b;
+      --muted: #557a82;
+      --primary: #0e7c86;        /* teal blue */
+      --primary-strong: #095c64;
+      --primary-soft: #d5eef0;
+      --accent: #1aa3b0;
+      --ok: #16865b;
+      --ok-soft: #dcf3e8;
+      --warn: #b26a00;
+      --warn-soft: #fdf0d8;
+      --bad: #c0392b;
+      --bad-soft: #fbe3e0;
+      --shadow: 0 1px 2px rgba(9, 60, 66, .06), 0 4px 16px rgba(9, 60, 66, .06);
+      --radius: 14px;
+    }
+
+    /* Dark theme follows the OS setting */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1a1d;
+        --surface: #112629;
+        --surface-2: #163236;
+        --border: #23474c;
+        --text: #e2f2f4;
+        --muted: #8fb3b9;
+        --primary: #2bb3bf;
+        --primary-strong: #5fd0da;
+        --primary-soft: #133f44;
+        --accent: #3cc6d2;
+        --ok: #4cc993;
+        --ok-soft: #14382a;
+        --warn: #f0b04a;
+        --warn-soft: #3b2c12;
+        --bad: #f07a6c;
+        --bad-soft: #3d1c19;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ---------- Header ---------- */
+    header {
+      background: linear-gradient(135deg, #095c64, #0e7c86 55%, #1aa3b0);
+      color: #fff;
+      padding: 28px 16px 72px;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    header h1 { margin: 0; font-size: 1.6rem; display: flex; align-items: center; gap: 10px; }
+    header p { margin: 6px 0 0; opacity: .88; max-width: 640px; }
+    .bot-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #7ff0c8; box-shadow: 0 0 0 4px rgba(127, 240, 200, .25);
+      display: inline-block;
+    }
+
+    main { padding: 0 16px 48px; margin-top: -48px; }
+
+    /* ---------- Stat tiles ---------- */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: var(--shadow);
+    }
+    .stat .label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .stat .value { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat.ok .value { color: var(--ok); }
+    .stat.warn .value { color: var(--warn); }
+    .stat.bad .value { color: var(--bad); }
+
+    /* ---------- Layout grid ---------- */
+    .grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      min-width: 0;
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .card h2 .count {
+      font-size: .78rem; font-weight: 600;
+      background: var(--primary-soft); color: var(--primary-strong);
+      padding: 2px 10px; border-radius: 999px;
+    }
+
+    /* ---------- Forms ---------- */
+    label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 4px; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .field { margin-bottom: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .btn {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: inherit; font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, transform .05s;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-strong); }
+    .btn-ghost { background: transparent; color: var(--primary); border-color: var(--border); }
+    .btn-ghost:hover { background: var(--surface-2); }
+    .btn-ok { background: var(--ok); color: #fff; }
+    .btn-bad { background: transparent; color: var(--bad); border-color: var(--bad); }
+    .btn-sm { padding: 6px 10px; font-size: .85rem; }
+    .btn-block { width: 100%; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ---------- Rules list ---------- */
+    .rule {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+    .rule:first-of-type { border-top: 0; padding-top: 0; }
+    .rule-body { flex: 1; min-width: 0; }
+    .rule-title { font-weight: 600; font-size: .92rem; }
+    .rule-desc { font-size: .82rem; color: var(--muted); }
+    .rule input[type="number"] { width: 110px; padding: 6px 8px; margin-top: 6px; }
+
+    /* Toggle switch */
+    .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; margin-top: 2px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: var(--border); border-radius: 999px; cursor: pointer;
+      transition: background .2s;
+    }
+    .slider::before {
+      content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: transform .2s;
+    }
+    .switch input:checked + .slider { background: var(--primary); }
+    .switch input:checked + .slider::before { transform: translateX(18px); }
+    .switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ---------- Tables ---------- */
+    .table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr:last-child td { border-bottom: 0; }
+
+    .badge {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      font-size: .76rem; font-weight: 600;
+    }
+    .badge.ok { background: var(--ok-soft); color: var(--ok); }
+    .badge.warn { background: var(--warn-soft); color: var(--warn); }
+    .badge.bad { background: var(--bad-soft); color: var(--bad); }
+
+    /* ---------- Review queue cards ---------- */
+    .review-item {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--warn);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      background: var(--surface);
+    }
+    .review-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .review-head strong { font-size: .98rem; }
+    .amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .reasons { margin: 8px 0 10px; padding-left: 18px; font-size: .85rem; color: var(--muted); }
+    .meta { font-size: .8rem; color: var(--muted); }
+
+    .empty { text-align: center; color: var(--muted); font-size: .9rem; padding: 18px 8px; }
+
+    /* ---------- Bot activity log ---------- */
+    .log {
+      max-height: 320px; overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .8rem;
+      background: var(--surface-2);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .log-line { padding: 3px 0; display: flex; gap: 8px; }
+    .log-line time { color: var(--muted); flex-shrink: 0; }
+    .log-line.ok span { color: var(--ok); }
+    .log-line.warn span { color: var(--warn); }
+    .log-line.bad span { color: var(--bad); }
+
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(120%);
+      background: var(--text); color: var(--bg);
+      padding: 10px 16px; border-radius: 10px; font-size: .9rem;
+      box-shadow: var(--shadow); transition: transform .25s; z-index: 10;
+      max-width: calc(100% - 32px);
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      header h1 { font-size: 1.3rem; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <h1><span class="bot-dot" aria-hidden="true"></span> Invoice Approval Bot</h1>
+      <p>Submit invoices and the bot runs them through your rules: small, clean bills are auto-approved, large ones go to a human, and duplicates are caught before they get paid twice.</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+
+      <!-- Summary tiles -->
+      <section class="stats" aria-label="Summary">
+        <div class="stat"><div class="label">Processed</div><div class="value" id="statTotal">0</div></div>
+        <div class="stat ok"><div class="label">Approved</div><div class="value" id="statApproved">0</div></div>
+        <div class="stat warn"><div class="label">Awaiting human</div><div class="value" id="statPending">0</div></div>
+        <div class="stat bad"><div class="label">Rejected</div><div class="value" id="statRejected">0</div></div>
+      </section>
+
+      <div class="grid">
+
+        <!-- ================= Left column: input + rules ================= -->
+        <div class="col">
+
+          <section class="card">
+            <h2>Submit invoice</h2>
+            <form id="invoiceForm" autocomplete="off">
+              <div class="field">
+                <label for="vendor">Vendor</label>
+                <input id="vendor" required placeholder="e.g. Acme Supplies">
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label for="invoiceNo">Invoice #</label>
+                  <input id="invoiceNo" required placeholder="INV-1001">
+                </div>
+                <div class="field">
+                  <label for="amount">Amount (USD)</label>
+                  <input id="amount" type="number" min="0" step="0.01" required placeholder="0.00">
+                </div>
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label for="date">Invoice date</label>
+                  <input id="date" type="date" required>
+                </div>
+                <div class="field">
+                  <label for="category">Category</label>
+                  <select id="category">
+                    <option>Office supplies</option>
+                    <option>Software</option>
+                    <option>Travel</option>
+                    <option>Utilities</option>
+                    <option>Services</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit">Run bot on invoice</button>
+            </form>
+            <div class="btn-row" style="margin-top:10px">
+              <button class="btn btn-ghost btn-sm" id="loadSamples" type="button">Load sample batch</button>
+              <button class="btn btn-ghost btn-sm" id="resetAll" type="button">Reset everything</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>Automation rules</h2>
+            <!-- Rules are rendered from the RULES array in JS -->
+            <div id="rulesList"></div>
+          </section>
+
+        </div>
+
+        <!-- ================= Right column: queues + log ================= -->
+        <div class="col">
+
+          <section class="card">
+            <h2>Human review queue <span class="count" id="queueCount">0</span></h2>
+            <div id="reviewQueue"></div>
+          </section>
+
+          <section class="card">
+            <h2>Processed invoices <span class="count" id="ledgerCount">0</span></h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Invoice #</th>
+                    <th class="num">Amount</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Decided by</th>
+                  </tr>
+                </thead>
+                <tbody id="ledgerBody"></tbody>
+              </table>
+            </div>
+            <div class="empty" id="ledgerEmpty">No invoices processed yet.</div>
+          </section>
+
+          <section class="card">
+            <h2>Bot activity log
+              <button class="btn btn-ghost btn-sm" id="clearLog" type="button">Clear</button>
+            </h2>
+            <div class="log" id="log" aria-live="polite"></div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    /* =========================================================
+       STATE
+       ---------------------------------------------------------
+       invoices: every invoice the bot has seen, with a status of
+                 "approved" | "pending" | "rejected".
+       settings: rule on/off switches and the review threshold.
+       logs:     the bot's step-by-step activity trail.
+       ========================================================= */
+    const STORAGE_KEY = 'invoice-bot-v1';
+
+    const DEFAULT_SETTINGS = {
+      threshold: 500,
+      enabled: { required: true, duplicate: true, nearDuplicate: true, threshold: true, futureDate: true }
+    };
+
+    let state = {
+      invoices: [],
+      settings: structuredClone(DEFAULT_SETTINGS),
+      logs: []
+    };
+
+    /* ---------- Persistence (localStorage can be unavailable, so guard it) ---------- */
+    function save() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+    }
+    function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        state = {
+          invoices: parsed.invoices || [],
+          logs: parsed.logs || [],
+          settings: {
+            threshold: parsed.settings?.threshold ?? DEFAULT_SETTINGS.threshold,
+            enabled: { ...DEFAULT_SETTINGS.enabled, ...(parsed.settings?.enabled || {}) }
+          }
+        };
+      } catch (e) { /* start fresh */ }
+    }
+
+    /* ---------- Small helpers ---------- */
+    const $ = (id) => document.getElementById(id);
+    const money = (n) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+    // Normalise text so "ACME Supplies " and "acme supplies" match,
+    // and "INV-001" matches "inv 001".
+    const normVendor = (s) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const normNumber = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Escape user text before inserting into HTML
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    /* =========================================================
+       RULE ENGINE
+       ---------------------------------------------------------
+       Each rule inspects an invoice and returns either null
+       (passed) or a result object:
+         { action: 'reject' | 'review', reason: '...' }
+
+       Rules are evaluated in order. A 'reject' result is final
+       and stops evaluation. 'review' results are collected so a
+       human sees every reason at once. If no rule fires, the
+       bot auto-approves the invoice.
+
+       To add a new rule, push another object into RULES.
+       ========================================================= */
+    const RULES = [
+      {
+        id: 'required',
+        title: 'Required fields present',
+        desc: 'Reject invoices missing vendor, number, a positive amount or date.',
+        check(inv) {
+          if (!inv.vendor || !inv.number || !inv.date || !(inv.amount > 0)) {
+            return { action: 'reject', reason: 'Missing or invalid required fields' };
+          }
+          return null;
+        }
+      },
+      {
+        id: 'duplicate',
+        title: 'Duplicate bill check',
+        desc: 'Reject if the same vendor + invoice # was already approved (or is already waiting for review).',
+        check(inv) {
+          const match = state.invoices.find((o) =>
+            o.id !== inv.id &&
+            (o.status === 'approved' || o.status === 'pending') &&
+            normVendor(o.vendor) === normVendor(inv.vendor) &&
+            normNumber(o.number) === normNumber(inv.number)
+          );
+          if (!match) return null;
+          return match.status === 'approved'
+            ? { action: 'reject', reason: `Duplicate — ${match.number} from ${match.vendor} was already approved` }
+            : { action: 'reject', reason: `Duplicate — ${match.number} from ${match.vendor} is already in the review queue` };
+        }
+      },
+      {
+        id: 'nearDuplicate',
+        title: 'Possible duplicate (same vendor, amount & date)',
+        desc: 'Send to a human if another approved bill matches vendor, amount and date under a different invoice #.',
+        check(inv) {
+          const match = state.invoices.find((o) =>
+            o.id !== inv.id &&
+            o.status === 'approved' &&
+            normVendor(o.vendor) === normVendor(inv.vendor) &&
+            o.amount === inv.amount &&
+            o.date === inv.date
+          );
+          return match
+            ? { action: 'review', reason: `Looks like ${match.number} (same vendor, amount and date)` }
+            : null;
+        }
+      },
+      {
+        id: 'threshold',
+        title: 'Human approval above threshold',
+        desc: 'Invoices over this amount need a person to approve.',
+        hasThreshold: true,
+        check(inv) {
+          const limit = state.settings.threshold;
+          return inv.amount > limit
+            ? { action: 'review', reason: `Amount ${money(inv.amount)} is above the ${money(limit)} limit` }
+            : null;
+        }
+      },
+      {
+        id: 'futureDate',
+        title: 'Future-dated invoice',
+        desc: 'Send to a human if the invoice date is in the future.',
+        check(inv) {
+          const today = new Date().toISOString().slice(0, 10);
+          return inv.date > today
+            ? { action: 'review', reason: `Invoice is dated in the future (${inv.date})` }
+            : null;
+        }
+      }
+    ];
+
+    /**
+     * Run every enabled rule against an invoice and decide its fate.
+     * Returns { status, reasons }.
+     */
+    function evaluate(inv) {
+      const reviewReasons = [];
+
+      for (const rule of RULES) {
+        if (!state.settings.enabled[rule.id]) {
+          log(`  ↳ skipped "${rule.title}" (disabled)`);
+          continue;
+        }
+        const result = rule.check(inv);
+        if (!result) {
+          log(`  ↳ passed "${rule.title}"`);
+          continue;
+        }
+        if (result.action === 'reject') {
+          log(`  ↳ failed "${rule.title}": ${result.reason}`, 'bad');
+          return { status: 'rejected', reasons: [result.reason] };
+        }
+        log(`  ↳ flagged "${rule.title}": ${result.reason}`, 'warn');
+        reviewReasons.push(result.reason);
+      }
+
+      return reviewReasons.length
+        ? { status: 'pending', reasons: reviewReasons }
+        : { status: 'approved', reasons: ['All rules passed'] };
+    }
+
+    /**
+     * The bot's main entry point: take raw input, evaluate it,
+     * record the outcome and refresh the UI.
+     */
+    function processInvoice(input, { quiet = false } = {}) {
+      const inv = {
+        id: uid(),
+        vendor: input.vendor.trim(),
+        number: input.number.trim(),
+        amount: Math.round(Number(input.amount) * 100) / 100,
+        date: input.date,
+        category: input.category,
+        submittedAt: new Date().toISOString()
+      };
+
+      log(`▶ Received ${inv.number} from ${inv.vendor} for ${money(inv.amount)}`);
+      const { status, reasons } = evaluate(inv);
+      inv.status = status;
+      inv.reasons = reasons;
+      inv.decidedBy = status === 'pending' ? null : 'Bot';
+
+      // Record before the next invoice runs, so a batch can catch its own duplicates
+      state.invoices.unshift(inv);
+
+      const outcome = {
+        approved: ['ok', 'Auto-approved'],
+        pending: ['warn', 'Sent to human review'],
+        rejected: ['bad', 'Rejected']
+      }[status];
+      log(`■ ${outcome[1]}: ${inv.number}`, outcome[0]);
+
+      if (!quiet) toast(`${inv.number}: ${outcome[1]}`);
+      save();
+      render();
+      return inv;
+    }
+
+    /* ---------- Human-in-the-loop decisions ---------- */
+    function humanDecision(id, approve) {
+      const inv = state.invoices.find((i) => i.id === id);
+      if (!inv || inv.status !== 'pending') return;
+
+      // Re-check duplicates at decision time: another copy may
+      // have been approved while this one waited in the queue.
+      if (approve && state.settings.enabled.duplicate) {
+        const dup = state.invoices.find((o) =>
+          o.id !== inv.id && o.status === 'approved' &&
+          normVendor(o.vendor) === normVendor(inv.vendor) &&
+          normNumber(o.number) === normNumber(inv.number)
+        );
+        if (dup) {
+          inv.status = 'rejected';
+          inv.decidedBy = 'Bot';
+          inv.reasons = [`Duplicate — ${dup.number} was approved while this waited`];
+          log(`■ Blocked human approval of ${inv.number}: already approved`, 'bad');
+          toast('Blocked: this bill was already approved');
+          save(); render();
+          return;
+        }
+      }
+
+      inv.status = approve ? 'approved' : 'rejected';
+      inv.decidedBy = 'Human';
+      inv.decidedAt = new Date().toISOString();
+      log(`■ Human ${approve ? 'approved' : 'rejected'} ${inv.number}`, approve ? 'ok' : 'bad');
+      toast(`${inv.number} ${approve ? 'approved' : 'rejected'}`);
+      save();
+      render();
+    }
+
+    /* ---------- Activity log ---------- */
+    function log(message, level = '') {
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      state.logs.unshift({ time, message, level });
+      state.logs = state.logs.slice(0, 200); // keep the log from growing forever
+    }
+
+    /* =========================================================
+       RENDERING
+       ========================================================= */
+    function render() {
+      renderStats();
+      renderQueue();
+      renderLedger();
+      renderLog();
+    }
+
+    function renderStats() {
+      const count = (s) => state.invoices.filter((i) => i.status === s).length;
+      $('statTotal').textContent = state.invoices.length;
+      $('statApproved').textContent = count('approved');
+      $('statPending').textContent = count('pending');
+      $('statRejected').textContent = count('rejected');
+    }
+
+    function renderQueue() {
+      const pending = state.invoices.filter((i) => i.status === 'pending');
+      $('queueCount').textContent = pending.length;
+
+      if (!pending.length) {
+        $('reviewQueue').innerHTML = '<div class="empty">Nothing waiting — the bot is handling everything. ✓</div>';
+        return;
+      }
+
+      $('reviewQueue').innerHTML = pending.map((inv) => `
+        <div class="review-item">
+          <div class="review-head">
+            <div>
+              <strong>${esc(inv.vendor)}</strong>
+              <div class="meta">${esc(inv.number)} · ${esc(inv.category)} · ${esc(inv.date)}</div>
+            </div>
+            <div class="amount">${money(inv.amount)}</div>
+          </div>
+          <ul class="reasons">${inv.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+          <div class="btn-row">
+            <button class="btn btn-ok btn-sm" data-approve="${inv.id}">Approve</button>
+            <button class="btn btn-bad btn-sm" data-reject="${inv.id}">Reject</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function renderLedger() {
+      const done = state.invoices.filter((i) => i.status !== 'pending');
+      $('ledgerCount').textContent = done.length;
+      $('ledgerEmpty').style.display = done.length ? 'none' : 'block';
+
+      const badge = { approved: 'ok', rejected: 'bad' };
+      $('ledgerBody').innerHTML = done.map((inv) => `
+        <tr title="${esc(inv.reasons.join('; '))}">
+          <td>${esc(inv.vendor)}</td>
+          <td>${esc(inv.number)}</td>
+          <td class="num">${money(inv.amount)}</td>
+          <td>${esc(inv.date)}</td>
+          <td><span class="badge ${badge[inv.status]}">${inv.status}</span></td>
+          <td>${esc(inv.decidedBy)}</td>
+        </tr>`).join('');
+    }
+
+    function renderLog() {
+      $('log').innerHTML = state.logs.length
+        ? state.logs.map((l) => `<div class="log-line ${l.level}"><time>${l.time}</time><span>${esc(l.message)}</span></div>`).join('')
+        : '<div class="empty">The bot is idle.</div>';
+    }
+
+    /** Draw the rule list with on/off switches and the editable threshold. */
+    function renderRules() {
+      $('rulesList').innerHTML = RULES.map((r) => `
+        <div class="rule">
+          <label class="switch" aria-label="Toggle ${esc(r.title)}">
+            <input type="checkbox" data-rule="${r.id}" ${state.settings.enabled[r.id] ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+          <div class="rule-body">
+            <div class="rule-title">${esc(r.title)}</div>
+            <div class="rule-desc">${esc(r.desc)}</div>
+            ${r.hasThreshold ? `
+              <label for="thresholdInput" style="margin-top:8px">Threshold (USD)</label>
+              <input id="thresholdInput" type="number" min="0" step="1" value="${state.settings.threshold}">` : ''}
+          </div>
+        </div>`).join('');
+    }
+
+    /* ---------- Toast notification ---------- */
+    let toastTimer;
+    function toast(msg) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    /* =========================================================
+       SAMPLE DATA — shows each rule in action
+       ========================================================= */
+    function sampleBatch() {
+      const d = (offset) => {
+        const dt = new Date();
+        dt.setDate(dt.getDate() + offset);
+        return dt.toISOString().slice(0, 10);
+      };
+      return [
+        { vendor: 'Acme Supplies',   number: 'INV-1001', amount: 245.50,  date: d(-6), category: 'Office supplies' }, // auto-approve
+        { vendor: 'CloudNine SaaS',  number: 'CN-7781',  amount: 1299.00, date: d(-4), category: 'Software' },        // > $500 → human
+        { vendor: 'acme supplies ',  number: 'inv 1001', amount: 245.50,  date: d(-6), category: 'Office supplies' }, // duplicate → reject
+        { vendor: 'City Power Co',   number: 'CP-0342',  amount: 188.20,  date: d(-2), category: 'Utilities' },       // auto-approve
+        { vendor: 'Acme Supplies',   number: 'INV-1002', amount: 245.50,  date: d(-6), category: 'Office supplies' }, // near-duplicate → human
+        { vendor: 'SkyHigh Travel',  number: 'SH-2201',  amount: 499.99,  date: d(-1), category: 'Travel' },          // just under limit
+        { vendor: 'Brightline Legal',number: 'BL-0090',  amount: 3200.00, date: d(5),  category: 'Services' }         // > $500 & future
+      ];
+    }
+
+    /* =========================================================
+       EVENT WIRING
+       ========================================================= */
+    $('invoiceForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      processInvoice({
+        vendor: $('vendor').value,
+        number: $('invoiceNo').value,
+        amount: $('amount').value,
+        date: $('date').value,
+        category: $('category').value
+      });
+      // Keep vendor & date for faster repeat entry; clear the rest
+      $('invoiceNo').value = '';
+      $('amount').value = '';
+      $('invoiceNo').focus();
+    });
+
+    $('loadSamples').addEventListener('click', () => {
+      log('— Processing sample batch —');
+      const results = sampleBatch().map((inv) => processInvoice(inv, { quiet: true }));
+      const pending = results.filter((r) => r.status === 'pending').length;
+      toast(`Batch done: ${results.length} invoices, ${pending} need a human`);
+    });
+
+    $('resetAll').addEventListener('click', () => {
+      if (!confirm('Clear all invoices, logs and rule settings?')) return;
+      state = { invoices: [], settings: structuredClone(DEFAULT_SETTINGS), logs: [] };
+      save(); renderRules(); render();
+      toast('Reset complete');
+    });
+
+    $('clearLog').addEventListener('click', () => { state.logs = []; save(); renderLog(); });
+
+    // Approve / reject buttons in the review queue (event delegation)
+    $('reviewQueue').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      if (btn.dataset.approve) humanDecision(btn.dataset.approve, true);
+      if (btn.dataset.reject) humanDecision(btn.dataset.reject, false);
+    });
+
+    // Rule toggles and threshold changes
+    $('rulesList').addEventListener('change', (e) => {
+      const t = e.target;
+      if (t.dataset.rule) {
+        state.settings.enabled[t.dataset.rule] = t.checked;
+        log(`⚙ Rule "${RULES.find((r) => r.id === t.dataset.rule).title}" ${t.checked ? 'enabled' : 'disabled'}`);
+      }
+      if (t.id === 'thresholdInput') {
+        const v = Math.max(0, Number(t.value) || 0);
+        state.settings.threshold = v;
+        t.value = v;
+        log(`⚙ Review threshold set to ${money(v)}`);
+      }
+      save(); renderLog();
+    });
+
+    /* ---------- Boot ---------- */
+    load();
+    $('date').value = new Date().toISOString().slice(0, 10);
+    renderRules();
+    render();
+  </script>
+</body>
+</html>
