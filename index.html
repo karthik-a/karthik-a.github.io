@@ -3,83 +3,157 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Karthz — Experiments</title>
+<title>Karthz's Lab · Something brewing</title>
 <style>
   :root {
-    --bg: #faf9f6;
-    --ink: #1c1b19;
-    --muted: #6b6860;
-    --card: #ffffff;
-    --line: #e6e3dc;
-    --accent: #d9622b;
+    --bg: #f7f2ea;
+    --ink: #2b1f18;
+    --muted: #8a7b6e;
+    --line: #e2d8c9;
+    --accent: #b8622e;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #151413;
-      --ink: #f1efe9;
-      --muted: #9b968b;
-      --card: #1e1d1b;
-      --line: #2c2a27;
-      --accent: #f08a54;
+      --bg: #17110d;
+      --ink: #f1e8dc;
+      --muted: #9a8a7b;
+      --line: #2e241c;
+      --accent: #e08a4f;
     }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
+    min-height: 100vh;
     background: var(--bg);
     color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--sans);
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 640px; margin: 0 auto; padding: 72px 20px 48px; }
-  h1 { font-size: 2rem; margin: 0 0 8px; letter-spacing: -0.02em; }
-  p.lead { color: var(--muted); margin: 0 0 36px; }
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-  a.card {
-    display: block;
-    padding: 18px 20px;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 14px;
+  main { max-width: 620px; margin: 0 auto; padding: 96px 24px 64px; }
+
+  /* mug mark */
+  .mark { width: 44px; height: 44px; color: var(--accent); margin-bottom: 28px; overflow: visible; }
+  .mark .steam path {
+    stroke-dasharray: 14;
+    stroke-dashoffset: 14;
+    opacity: 0;
+    animation: wisp 3.6s ease-in-out infinite;
+  }
+  .mark .steam path:nth-child(2) { animation-delay: 1.2s; }
+  .mark .steam path:nth-child(3) { animation-delay: 2.4s; }
+  @keyframes wisp {
+    0%   { stroke-dashoffset: 14; opacity: 0; transform: translateY(3px); }
+    35%  { opacity: .9; }
+    100% { stroke-dashoffset: -14; opacity: 0; transform: translateY(-5px); }
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(2.2rem, 7vw, 3rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 10px;
+  }
+  .tagline { color: var(--muted); font-family: var(--serif); font-style: italic; font-size: 1.2rem; margin: 0 0 64px; }
+  .tagline .dots span { animation: blink 1.6s infinite; opacity: .2; }
+  .tagline .dots span:nth-child(2) { animation-delay: .25s; }
+  .tagline .dots span:nth-child(3) { animation-delay: .5s; }
+  @keyframes blink { 0%,80%,100% { opacity: .2; } 40% { opacity: 1; } }
+
+  .label {
+    font-size: .72rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 6px;
+  }
+
+  ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  li { border-bottom: 1px solid var(--line); }
+
+  a.row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto 20px;
+    align-items: baseline;
+    gap: 12px;
+    padding: 22px 4px;
     color: inherit;
     text-decoration: none;
-    transition: transform .15s ease, border-color .15s ease;
+    transition: padding .25s ease;
   }
-  a.card:hover, a.card:focus-visible {
-    transform: translateY(-2px);
-    border-color: var(--accent);
-    outline: none;
+  a.row:hover, a.row:focus-visible { padding-left: 12px; outline: none; }
+
+  .n { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .name { font-family: var(--serif); font-size: 1.4rem; letter-spacing: -0.01em; }
+  a.row:hover .name, a.row:focus-visible .name { color: var(--accent); }
+  .desc { display: block; font-family: var(--sans); font-size: .9rem; color: var(--muted); margin-top: 2px; }
+  .status { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+  .status::before {
+    content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); margin-right: 8px; vertical-align: 1px; opacity: .85;
   }
-  .title { font-weight: 600; font-size: 1.05rem; }
-  .desc { color: var(--muted); font-size: .92rem; margin-top: 2px; }
-  footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
+  .arrow { color: var(--muted); transition: transform .25s ease, color .25s ease; text-align: right; }
+  a.row:hover .arrow, a.row:focus-visible .arrow { transform: translateX(4px); color: var(--accent); }
+
+  footer { margin-top: 56px; color: var(--muted); font-size: .85rem; }
+
+  @media (max-width: 520px) {
+    main { padding-top: 64px; }
+    a.row { grid-template-columns: 28px 1fr 20px; }
+    .status { grid-column: 2; grid-row: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .mark .steam path { opacity: .6; stroke-dashoffset: 0; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>Experiments</h1>
-  <p class="lead">Small things I built while learning to build with AI.</p>
+  <svg class="mark" viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <g class="steam">
+      <path d="M15 12c-2-2 2-4 0-7"/>
+      <path d="M22 12c-2-2 2-4 0-7"/>
+      <path d="M29 12c-2-2 2-4 0-7"/>
+    </g>
+    <path d="M9 18h26v8a10 10 0 0 1-10 10h-6A10 10 0 0 1 9 26z"/>
+    <path d="M35 21h2a4 4 0 0 1 0 8h-3"/>
+  </svg>
+
+  <h1>Karthz's Lab</h1>
+  <p class="tagline">Something brewing<span class="dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></p>
+
+  <p class="label">Experiments</p>
   <ul>
     <li>
-      <a class="card" href="tetris.html">
-        <div class="title">Tetris</div>
-        <div class="desc">Classic falling-blocks game, playable in the browser.</div>
+      <a class="row" href="tetris.html">
+        <span class="n">01</span>
+        <span class="name">Tetris<span class="desc">Stack the blocks. Don't let them reach the top.</span></span>
+        <span class="status">Fresh pour</span>
+        <span class="arrow">→</span>
       </a>
     </li>
     <li>
-      <a class="card" href="habit-tracker.html">
-        <div class="title">Habit Tracker</div>
-        <div class="desc">Track daily habits and keep your streaks going.</div>
+      <a class="row" href="habit-tracker.html">
+        <span class="n">02</span>
+        <span class="name">Habit Tracker<span class="desc">Tick things off. Keep the streak alive.</span></span>
+        <span class="status">Steeping</span>
+        <span class="arrow">→</span>
       </a>
     </li>
     <li>
-      <a class="card" href="invoice-bot.html">
-        <div class="title">Invoice Bot</div>
-        <div class="desc">Generate invoices quickly from a simple interface.</div>
+      <a class="row" href="invoice-bot.html">
+        <span class="n">03</span>
+        <span class="name">Invoice Bot<span class="desc">Paperwork, but make it automatic.</span></span>
+        <span class="status">Still brewing</span>
+        <span class="arrow">→</span>
       </a>
     </li>
   </ul>
-  <footer>More experiments coming.</footer>
+
+  <footer>Built while learning to build with AI.</footer>
 </main>
 </body>
 </html>
