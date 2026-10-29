@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karthz — Experiments</title>
+<style>
+  :root {
+    --bg: #faf9f6;
+    --ink: #1c1b19;
+    --muted: #6b6860;
+    --card: #ffffff;
+    --line: #e6e3dc;
+    --accent: #d9622b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151413;
+      --ink: #f1efe9;
+      --muted: #9b968b;
+      --card: #1e1d1b;
+      --line: #2c2a27;
+      --accent: #f08a54;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 72px 20px 48px; }
+  h1 { font-size: 2rem; margin: 0 0 8px; letter-spacing: -0.02em; }
+  p.lead { color: var(--muted); margin: 0 0 36px; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  a.card {
+    display: block;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    color: inherit;
+    text-decoration: none;
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  a.card:hover, a.card:focus-visible {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    outline: none;
+  }
+  .title { font-weight: 600; font-size: 1.05rem; }
+  .desc { color: var(--muted); font-size: .92rem; margin-top: 2px; }
+  footer { margin-top: 40px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Experiments</h1>
+  <p class="lead">Small things I built while learning to build with AI.</p>
+  <ul>
+    <li>
+      <a class="card" href="tetris.html">
+        <div class="title">Tetris</div>
+        <div class="desc">Classic falling-blocks game, playable in the browser.</div>
+      </a>
+    </li>
+    <li>
+      <a class="card" href="habit-tracker.html">
+        <div class="title">Habit Tracker</div>
+        <div class="desc">Track daily habits and keep your streaks going.</div>
+      </a>
+    </li>
+    <li>
+      <a class="card" href="invoice-bot.html">
+        <div class="title">Invoice Bot</div>
+        <div class="desc">Generate invoices quickly from a simple interface.</div>
+      </a>
+    </li>
+  </ul>
+  <footer>More experiments coming.</footer>
+</main>
+</body>
+</html>
